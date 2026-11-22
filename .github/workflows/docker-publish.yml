@@ -8,9 +8,6 @@ on:
     branches: [main]
   workflow_dispatch:
 
-env:
-  IMAGE_NAME: ${{ github.repository }}
-
 jobs:
   build-and-push:
     runs-on: ubuntu-latest
@@ -37,7 +34,7 @@ jobs:
         id: meta
         uses: docker/metadata-action@v5
         with:
-          images: ghcr.io/${{ env.IMAGE_NAME }}
+          images: ghcr.io/christoph08/swe3_hw4_docker
           tags: |
             type=ref,event=branch
             type=ref,event=tag
