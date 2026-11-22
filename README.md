@@ -1,42 +1,104 @@
-# URL Shortener
+# SWE3 – Homework 4: Docker & CI/CD
 
-A small ASP.NET Core 10 API to create short links and store them in Postgres.
-A `GET /{code}` request redirects to the original URL and increments a click counter, so persistence is easy to see.
+This repository contains the implementation of a university assignment focused on **Docker containerization and CI/CD with GitHub Actions**.
 
-- Swagger UI at `/swagger`
-- PostgreSQL via EF Core (with a checked-in migration)
-- One entity, four link endpoints, one redirect endpoint
-- Two Dockerfiles: a naively written one and an optimized one
+## Provided application
 
-## Endpoints
+The original C# / ASP.NET Core URL Shortener application was provided as the starting project for this assignment. **The application source code is not my own work.** The Dockerfiles, Docker Compose configuration, and GitHub Actions workflow in this repository are the work completed for this exercise.
 
-| Method | Path | Description |
+The application creates and manages short links and redirects requests to their original URLs. Data is persisted in PostgreSQL using Entity Framework Core.
+
+## Assignment requirements
+
+- An intentionally inefficient Dockerfile
+- An optimized Dockerfile
+- A Docker Compose configuration that starts the URL Shortener and PostgreSQL
+- A GitHub Actions pipeline that builds the Docker image and publishes it to GitHub Container Registry (GHCR)
+
+## Repository structure
+
+| File | Purpose |
+|---|---|
+| `Dockerfile` | Deliberately inefficient single-stage build using the .NET SDK image |
+| `Dockerfile.optimized` | Multi-stage build with a smaller ASP.NET runtime image and better layer caching |
+| `compose.yaml` | Starts the application and PostgreSQL with a persistent volume and database healthcheck |
+| `.github/workflows/docker-publish.yml` | Builds the optimized image and publishes it to GHCR |
+| `.dockerignore` | Excludes local build output and development files from the Docker build context |
+
+## Run locally with Docker Compose
+
+Requirements: Docker Engine and Docker Compose v2.
+
+1. Optionally create a local environment file:
+
+   ```bash
+   cp .env.example .env
+   ```
+
+2. Start the services:
+
+   ```bash
+   docker compose up --build -d
+   ```
+
+3. Open the API documentation:
+
+   - Swagger UI: http://localhost:8080/swagger
+   - Health endpoint: http://localhost:8080/healthz
+
+4. Stop the services:
+
+   ```bash
+   docker compose down
+   ```
+
+PostgreSQL data is stored in the named Docker volume `postgres_data`. To remove the volume as well (this deletes the database data):
+
+```bash
+docker compose down -v
+```
+
+The application applies its Entity Framework Core migrations on startup and seeds two example links: `/dotnet` and `/docker`.
+
+## Example endpoints
+
+| Method | Endpoint | Description |
 |---|---|---|
 | `POST` | `/api/links` | Create a short link |
 | `GET` | `/api/links` | List all short links |
-| `GET` | `/api/links/{code}` | Get one short link |
+| `GET` | `/api/links/{code}` | Get a short link |
 | `DELETE` | `/api/links/{code}` | Delete a short link |
-| `GET` | `/{code}` | Redirect to the original URL (HTTP 302) |
-| `GET` | `/healthz` | App + database health |
+| `GET` | `/{code}` | Redirect to the original URL |
+| `GET` | `/healthz` | Application and database health |
 
-Two links are seeded on first start: `/dotnet` and `/docker`.
+Example: open http://localhost:8080/dotnet to follow the seeded redirect.
 
-## Project layout
+## Dockerfile comparison
+
+### Inefficient build
+
+The root `Dockerfile` uses the full .NET SDK image for both building and running the application. It copies the complete source tree before restoring NuGet packages, so ordinary source changes can invalidate the restore layer. The final image also contains the SDK and build tooling.
+
+### Optimized build
+
+`Dockerfile.optimized` uses a multi-stage build. The SDK image is used only to restore and publish the application; the final stage uses the smaller ASP.NET runtime image. Project files are copied and restored before the source files, allowing Docker to reuse the NuGet restore layer when only application code changes.
+
+Both Dockerfiles are provided for comparison. Docker Compose and CI use the optimized Dockerfile.
+
+## GitHub Actions and image publishing
+
+The workflow at `.github/workflows/docker-publish.yml` builds the optimized image. It publishes images to **GitHub Container Registry (GHCR)** when code is pushed to `main` or a version tag (`v*`). Pull requests trigger a build without publishing an image.
+
+The workflow uses the automatically provided `GITHUB_TOKEN` with the `packages: write` permission; no personal access token needs to be stored as a repository secret.
+
+After the first successful publish, the image is available at:
 
 ```text
-url-shortener/
-├── Program.cs                     # app setup, Swagger, startup migration + seed
-├── Endpoints/LinkEndpoints.cs     # all endpoints
-├── Models/ShortLink.cs
-├── Contracts/LinkContracts.cs     # request/response records
-├── Data/
-│   ├── ShortLinkDbContext.cs
-│   ├── ShortLinkDbContextFactory.cs  # for `dotnet ef`
-│   └── Migrations/
-└── .env.example
+ghcr.io/christoph08/swe3_hw4_docker:latest
 ```
 
-## Requirements
+Depending on package visibility settings, the package may need to be made public in the GitHub Packages settings.
 
-Docker with Compose v2 (the `docker compose` command). To run the
-API outside Docker you need the .NET 10 SDK and a PostgreSQL 17 instance.
+## Original application
+
+The original URL Shortener implementation was supplied as part of the course assignment. This repository focuses on the containerization and CI/CD tasks listed above; it does not claim authorship of the provided application code.
