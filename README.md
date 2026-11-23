@@ -77,11 +77,24 @@ Example: open http://localhost:8080/dotnet to follow the seeded redirect.
 
 ### Inefficient build
 
-The root `Dockerfile` uses the full .NET SDK image for both building and running the application. It copies the complete source tree before restoring NuGet packages, so ordinary source changes can invalidate the restore layer. The final image also contains the SDK and build tooling.
+The root `Dockerfile` uses the full .NET SDK image for both building and running the application. It copies the complete source tree before restoring packages, so ordinary source changes can invalidate the restore layer. The final image also contains the SDK and build tooling.
 
 ### Optimized build
 
 `Dockerfile.optimized` uses a multi-stage build. The SDK image is used only to restore and publish the application; the final stage uses the smaller ASP.NET runtime image. Project files are copied and restored before the source files, allowing Docker to reuse the NuGet restore layer when only application code changes.
+
+### Measured image size
+
+Both images were built locally on the same machine and compared using `docker images url-shortener`.
+
+| Metric | Inefficient | Optimized | Improvement |
+|---|---:|---:|---:|
+| Docker disk usage | 1.81 GB | 354 MB | **~80.4% smaller** |
+| Image content size | 547 MB | 101 MB | **~81.5% smaller** |
+
+The optimized image uses approximately one fifth of the disk space of the inefficient image. This is mainly because the final stage contains only the ASP.NET runtime and published application, not the full .NET SDK and build tools.
+
+The measured build durations were 186.3 seconds for the inefficient build and 52.4 seconds for the optimized build. These times are **not a controlled performance comparison**, because the optimized build could reuse base-image layers that had already been downloaded during the first build. The image-size comparison is the more meaningful result of this test.
 
 Both Dockerfiles are provided for comparison. Docker Compose and CI use the optimized Dockerfile.
 
